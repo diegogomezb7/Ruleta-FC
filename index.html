@@ -1,0 +1,521 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml">
+
+<head runat="server">
+    <!--Favicon-->
+    <link rel="icon" type="image/png" href="src/img/logo.png" />
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    <title>Ruleta de Premios</title>
+    <!--Ruleta-->
+    <script src="js/Winwheel.min.js"></script>
+    <script src="js/TweenMax.min.js"></script>
+    <!--jQuery-->
+    <script src="js/jquery-3.2.1.slim.min.js"></script>
+    <!--Sweet Alert-->
+    <link href="css/sweetalert2.css" rel="stylesheet" />
+    <script src="js/sweetalert2.min.js"></script>
+    <!--Bootstrap-->
+    <link rel="stylesheet" href="css/bootstrap.min.css" />
+    <!--css-->
+    <link rel="stylesheet" href="css/style.css" />
+
+    <!--Font Awesome-->
+    <link rel="stylesheet" href="css/font-awesome.min.css" />
+
+    <script>
+        function explosionSerpentina() {
+            // Centro
+            confetti({
+                particleCount: 150,
+                spread: 70,
+                origin: {
+                    x: 0.5,
+                    y: 0.5
+                }
+            });
+
+            // Laterales
+            setTimeout(() => {
+                confetti({
+                    particleCount: 100,
+                    angle: 60,
+                    spread: 55,
+                    origin: {
+                        x: 0
+                    }
+                });
+                confetti({
+                    particleCount: 100,
+                    angle: 120,
+                    spread: 55,
+                    origin: {
+                        x: 1
+                    }
+                });
+            }, 200);
+        }
+    </script>
+
+    <!--Imagen de Fondo-->
+
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+
+    <!-- Incluir la biblioteca SheetJS desde un CDN -->
+    <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.17.5/xlsx.full.min.js"></script>
+
+    <style type="text/css">
+        html,
+        body {
+            height: 100vh;
+            margin: 0;
+            overflow: hidden;
+        }
+
+        body {
+            background-image: url("src/img/banner.png");
+            background-repeat: no-repeat;
+            background-attachment: fixed;
+            background-position: center;
+            background-size: 100% 100%;
+        }
+
+        #canvasContainer {
+            background-image: url(src/img/rueda_gobernacion.png);
+            background-repeat: no-repeat;
+            background-position: center;
+            width: 700px;
+            height: 690px;
+            cursor: pointer;
+        }
+
+        .tuclase {
+            text-align: center;
+            font-family: Arial Black;
+            color: #0071bb;
+            font-weight: bold;
+            font-size: 6rem;
+            text-shadow: 0 1px 0 #ddd, 0 2px 0 #ccc, 0 3px 0 #bbb, 0 4px 0 #aaa, 0 5px 0 #acacac, 0 6px 1px rgba(0, 0, 0, 0.1), 0 0 5px rgba(0, 0, 0, 0.1), 0 1px 3px rgba(0, 0, 0, 0.3), 0 3px 5px rgba(0, 0, 0, 0.2), 0 5px 10px rgba(0, 0, 0, 0.25), 0 10px 10px rgba(0, 0, 0, 0.2), 0 20px 20px rgba(0, 0, 0, 0.15);
+        }
+
+        .banner-superior {
+            width: 100%;
+            max-height: 150px;
+            overflow: hidden;
+        }
+
+        .banner-superior img {
+            width: 100%;
+            height: auto;
+            max-height: 150px;
+            object-fit: cover;
+            /* 🔑 clave para 1920x150 */
+            display: block;
+        }
+
+        /* Estilos para SweetAlert2 responsive */
+        .responsive-swal img {
+            max-width: 100%;
+            height: auto;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="banner-superior">
+        <img src="src/img/logo-top.png" alt="Banner superior" />
+    </div>
+    <form id="form1" runat="server">
+        <div class="container-fluid">
+            <div class="row">
+
+                <!--Logotipo ruleta-->
+                <div class="col-sm-4" id="divcargadatos">
+                    <input type="file" id="fileInput" />
+                    <input type="button" id="btncargadatos" onclick="cargarDatos();"
+                        class="btn btn-primary btn-lg btn-block" value="Cargar Personas!" />
+                </div>
+                <div class="col-sm-4">
+                    <input type="button" id="spinButton" onclick="spinWheel();" class="btn btn-primary btn-lg btn-block"
+                        value="¡Girar!" />
+                    <input type="button" id="spinAgainButton" onclick="spinAgain();"
+                        class="btn btn-primary btn-lg btn-block" value="¡Girar!" />
+                </div>
+            </div>
+            <div class="row">
+                <!--Logotipo ruleta-->
+                <div class="col-sm-4">
+
+                    <div id="tablaContainer"></div>
+                    <div id="paginacionContainer"></div>
+                    <div style="margin-top: 10px;">
+                        <button type="button" class="btn btn-success" onclick="descargarGanadores()">Descargar
+                            Ganadores</button>
+                        <button type="button" class="btn btn-warning" onclick="descargarRestantes()">Descargar
+                            Restantes</button>
+                    </div>
+                </div>
+                <div class="col-sm-4" class="align-baseline" style="width: 200px;">
+                    <div class="mx-auto" style="width: 300px;">
+                        <br />
+                        <!--Boton Girar-->
+                        <div id="canvasContainer">
+                            <canvas id="canvas" width="700" height="690">
+                                Canvas not supported, please user another browser.
+                            </canvas>
+                        </div>
+
+                        <!--Boton Girar-->
+
+                        <canvas>
+                            <script>
+                                //carga de archivo .xlsx
+                                var mostrarruleta = false;
+                                var jsonData;
+                                var arraylists = [];
+                                document.getElementById('fileInput').addEventListener('change', handleFile);
+                                function handleFile(event) {
+                                    const file = event.target.files[0];
+
+                                    if (!file) {
+                                        console.error('No se seleccionó ningún archivo.');
+                                        return;
+                                    }
+                                    //carga de archivo .xlsx
+
+                                    //lectura de información cargada en el documento
+                                    const reader = new FileReader();
+
+                                    reader.onload = function (e) {
+                                        const data = e.target.result;
+                                        const workbook = XLSX.read(data, { type: 'binary' });
+                                        const sheetName = workbook.SheetNames[0];
+                                        const sheet = workbook.Sheets[sheetName];
+                                        jsonData = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+                                    };
+                                    //lectura de información cargada en el documento
+                                    reader.readAsBinaryString(file);
+                                    mostrarCargaPersonas()
+                                }
+
+                                var datos = [];
+                                var paginaActual = 1;
+                                var filasPorPagina = 5;
+                                // Función para crear la tabla
+                                function crearTabla() {
+                                    var tablaExistente = document.querySelector(".content-table");
+                                    if (tablaExistente) tablaExistente.remove();
+
+                                    var tabla = document.createElement("table");
+                                    tabla.className = "content-table";
+
+                                    // Encabezado
+                                    var encabezado = tabla.createTHead();
+                                    var filaEncabezado = encabezado.insertRow();
+                                    ["Id", "Nombre", "Premio"].forEach(t => {
+                                        var th = document.createElement("th");
+                                        th.innerHTML = t;
+                                        filaEncabezado.appendChild(th);
+                                    });
+
+                                    var cuerpoTabla = document.createElement("tbody");
+
+                                    // Paginación: calcular filas a mostrar
+                                    var inicio = (paginaActual - 1) * filasPorPagina;
+                                    var fin = inicio + filasPorPagina;
+                                    var filasAMostrar = datos.slice(inicio, fin);
+
+                                    filasAMostrar.forEach(row => {
+                                        var fila = document.createElement("tr");
+                                        row.forEach(col => {
+                                            var celda = document.createElement("td");
+                                            celda.innerHTML = col;
+                                            fila.appendChild(celda);
+                                        });
+                                        cuerpoTabla.appendChild(fila);
+                                    });
+
+                                    tabla.appendChild(cuerpoTabla);
+                                    document.getElementById("tablaContainer").appendChild(tabla);
+
+                                    generarPaginacion();
+                                }
+
+                                function generarPaginacion() {
+                                    var pag = document.getElementById("paginacionContainer");
+                                    pag.innerHTML = ""; // limpiar
+
+                                    var totalPaginas = Math.ceil(datos.length / filasPorPagina);
+
+                                    if (totalPaginas <= 1) return;
+
+                                    for (let i = 1; i <= totalPaginas; i++) {
+                                        let boton = document.createElement("button");
+                                        boton.innerText = i;
+                                        boton.className = "btn btn-sm " + (i === paginaActual ? "btn-primary" : "btn-secondary");
+                                        boton.style.margin = "2px";
+
+                                        boton.onclick = function () {
+                                            paginaActual = i;
+                                            crearTabla();
+                                        };
+                                        pag.appendChild(boton);
+                                    }
+                                }
+
+                                // Llamar a la función para crear la tabla
+                                crearTabla();
+
+                                // Función para agregar datos a la tabla
+                                function agregarDatos(ganador, id) {
+                                    // Nuevos datos a agregar
+                                    var nuevosDatos = [
+                                        [id, ganador, "SORPRESA"]
+                                    ];
+
+                                    // Obtener la tabla y su cuerpo
+                                    var tabla = document.querySelector(".content-table");
+                                    var cuerpoTabla = tabla.querySelector("tbody");
+
+                                    // Crear y agregar las filas de datos
+                                    for (var i = 0; i < nuevosDatos.length; i++) {
+                                        var fila = document.createElement("tr");
+                                        for (var j = 0; j < nuevosDatos[i].length; j++) {
+                                            var celda = document.createElement("td");
+                                            celda.innerHTML = nuevosDatos[i][j];
+                                            fila.appendChild(celda);
+                                        }
+                                        datos.unshift([id, ganador, "SORPRESA"]);
+                                        paginaActual = 1; // volver a la primera página
+                                        crearTabla();
+                                    }
+                                }
+
+                                document.getElementById("tablaContainer").style.display = "none";
+                                document.getElementById("spinAgainButton").style.display = "none";
+                                function ganador(ganadortxt) {
+                                    swal({
+                                        title: '<i><font color="#263370"><h2><strong>Ganador!</strong></h2></font></i>',
+                                        imageUrl: 'src/img/logo.png',
+                                        imageAlt: 'Custom image',
+                                        customClass: 'responsive-swal', // Clase personalizada para mayor control en CSS
+                                        width: '300px', // Reducido el ancho de la alerta
+                                        padding: 20,
+                                        html: '<div style="font-size: 25px;">' + ganadortxt + '</div>',
+                                        showCloseButton: true,
+                                        focusConfirm: false,
+                                        confirmButtonText:
+                                            '<i class="fa fa-thumbs-up"></i> Continuar!',
+                                        confirmButtonColor: '#015dca', // Set the color to blue
+                                        confirmButtonAriaLabel: 'Thumbs up, great!',
+                                    });
+                                }
+
+                                //Ruletasegmentos
+
+                                // Definir un array de datos para los segmentos
+
+                                var arraycolores = ["#002060", "#ff6010", "#31B656", "#F2C557"];
+
+                                var datosSegmentos = [];
+
+                                function armarsegmento() {
+                                    var lencolores = arraycolores.length; //4
+                                    var lenpersonas = arraylists.length; //4
+                                    var counter = lenpersonas / lencolores; //1
+                                    for (let indexext = 1; indexext < counter; indexext++) {
+                                        arraycolores.push("#002060");
+                                        arraycolores.push("#f7003c");
+                                        arraycolores.push("#31B656");
+                                        arraycolores.push("#F2C557");
+                                    }
+
+                                    for (let index = 0; index < lenpersonas; index++) {
+                                        datosSegmentos.push({ 'fillStyle': arraycolores[index], 'toxt': arraylists[index], 'number': index });
+                                    }
+                                    showRuleta();
+                                }
+                                var miRuleta;
+                                var arrayganadores = [];
+                                function showRuleta() {
+                                    miRuleta = new Winwheel({
+                                        'numSegments': datosSegmentos.length, // Número de segmentos
+                                        'outerRadius': 270, // Radio externo
+                                        'innerRadius': 80,
+                                        'segments': datosSegmentos.map(function (segment, index) {
+                                            return {
+                                                'fillStyle': segment.fillStyle,
+                                                'text': segment.text,
+                                                'number': (index + 1).toString() // Números del primero al ultimo dato
+                                            };
+                                        }),
+                                        'animation': {
+                                            'type': 'spinToStop',
+                                            'duration': 4,   // velocidad alta
+                                            'spins': 20,     // aumenta la rotación
+                                            'callbackFinished': 'Mensaje()',
+                                            'callbackAfter': 'dibujarIndicador()'
+                                        }
+                                    });
+                                    dibujarIndicador();
+                                }
+
+                                function Mensaje() {
+                                    document.getElementById("tablaContainer").style.display = "block";
+                                    var SegmentoSeleccionado = winningSegment = miRuleta.getIndicatedSegment();
+                                    var MensajeSeleccionado = winningSegment.number;
+                                    arrayganadores.push(datosSegmentos[parseInt(MensajeSeleccionado) - 1]["toxt"]);
+
+                                    // 🎉 EXPLOSIÓN DE SERPENTINA
+                                    explosionSerpentina();
+                                    agregarDatos(datosSegmentos[parseInt(MensajeSeleccionado) - 1]["toxt"], arrayganadores.length);
+                                    ganador(datosSegmentos[parseInt(MensajeSeleccionado) - 1]["toxt"]);
+                                    datosSegmentos.splice(parseInt(MensajeSeleccionado) - 1, 1);
+                                    showRuleta();
+                                    //Reinicio de Ruleta
+                                    //miRuleta.stopAnimation(false);
+                                    //miRuleta.rotationAngle = 0;
+                                    //miRuleta.draw();
+                                    //dibujarIndicador();
+                                    document.getElementById("spinButton").style.display = "none";
+                                    document.getElementById("spinAgainButton").style.display = "block";
+                                }
+
+
+
+                                function dibujarIndicador() {
+                                    var ctx = miRuleta.ctx;
+                                    distnaciaX = 150;
+                                    distnaciaY = 50;
+                                    ctx = miRuleta.ctx;
+                                    ctx.strokeStyle = '#FF6528';
+                                    ctx.fillStyle = '#FF6528';
+                                    ctx.lineWidth = 1;
+                                    ctx.beginPath();
+                                    ctx.moveTo(distnaciaX + 170, distnaciaY + 5);
+                                    ctx.lineTo(distnaciaX + 230, distnaciaY + 5);
+                                    ctx.lineTo(distnaciaX + 200, distnaciaY + 40);
+                                    ctx.lineTo(distnaciaX + 171, distnaciaY + 5);
+                                    ctx.stroke();
+                                    ctx.fill();
+                                }
+
+                                function spinWheel() {
+                                    miRuleta.rotationAngle = 0; // Reset rotation angle before spinning
+                                    // Ángulo aleatorio entre 0° y 359°
+                                    var randomAngle = Math.floor(Math.random() * 360);
+
+                                    // Asignar ese punto final
+                                    miRuleta.animation.stopAngle = randomAngle;
+
+                                    document.getElementById("spinButton").style.display = "none";
+
+                                    miRuleta.startAnimation();
+                                }
+
+                                function spinAgain() {
+                                    miRuleta.animation.type = 'spinToStop';
+                                    miRuleta.animation.duration = 5;
+                                    // Hide the "Girar de nuevo" button and show the "Girar" button
+                                    document.getElementById("spinButton").style.display = "block";
+                                    document.getElementById("spinAgainButton").style.display = "none";
+                                    spinWheel();
+                                }
+
+                                function mostrarCargaPersonas() {
+                                    // Obtenemos el elemento del botón por su id
+                                    var boton = document.getElementById('btncargadatos');
+                                    boton.style.display = 'block';
+                                }
+                                function ocultarCargaPersonas() {
+                                    document.getElementById("btncargadatos").style.display = "none";
+                                    document.getElementById("spinButton").style.display = "none";
+                                }
+                                ocultarCargaPersonas();
+                                function cargarDatos() {
+                                    // Obtenemos el elemento del botón por su id
+                                    var boton = document.getElementById('divcargadatos');
+                                    boton.style.display = 'none';
+                                    document.getElementById("spinButton").style.display = "block";
+
+                                    mostrarruleta = true;
+
+                                    // Mostrar los datos en la consola
+
+                                    for (let index = 0; index < jsonData.length; index++) {
+                                        const element = jsonData[index];
+                                        arraylists.push(element[0]);
+                                    }
+                                    armarsegmento();
+                                }
+
+                                var audio = new Audio();
+
+                                // Especifica la ruta del archivo de audio
+                                audio.src = 'src/audio/ambiente.mp3';
+
+                                // Espera a que el usuario haga clic en la página
+                                document.body.addEventListener('click', function () {
+                                    // Inicia la reproducción del audio
+                                    audio.loop = true;
+                                    audio.play();
+                                });
+
+                                function descargarGanadores() {
+                                    if (datos.length === 0) {
+                                        alert("No hay ganadores todavía.");
+                                        return;
+                                    }
+
+                                    // Crear hoja Excel
+                                    var wb = XLSX.utils.book_new();
+                                    var ws = XLSX.utils.aoa_to_sheet([["Id", "Nombre", "Premio"]]);
+
+                                    var dataFinal = datos.map(row => row); // ya están ordenados descendente
+                                    XLSX.utils.sheet_add_aoa(ws, dataFinal, { origin: "A2" });
+
+                                    XLSX.utils.book_append_sheet(wb, ws, "Ganadores");
+
+                                    XLSX.writeFile(wb, "ganadores.xlsx");
+                                    return false;
+                                }
+
+                                function descargarRestantes() {
+                                    if (arraylists.length === 0) {
+                                        alert("No hay personas cargadas.");
+                                        return;
+                                    }
+
+                                    // Convertir ganadores a set para búsqueda rápida
+                                    var setGanadores = new Set(arrayganadores);
+
+                                    // Filtrar los que NO han ganado
+                                    var restantes = arraylists.filter(nombre => !setGanadores.has(nombre));
+
+                                    if (restantes.length === 0) {
+                                        alert("No quedan participantes restantes.");
+                                        return;
+                                    }
+
+                                    // Crear hoja Excel
+                                    var wb = XLSX.utils.book_new();
+                                    var ws = XLSX.utils.aoa_to_sheet([["Id", "Nombre"]]);
+
+                                    // Identificadores numéricos (1, 2, 3...)
+                                    var dataRestantes = restantes.map((n, i) => [i + 1, n]);
+                                    XLSX.utils.sheet_add_aoa(ws, dataRestantes, { origin: "A2" });
+
+                                    XLSX.utils.book_append_sheet(wb, ws, "Restantes");
+
+                                    XLSX.writeFile(wb, "restantes.xlsx");
+                                    return false;
+                                }
+                            </script>
+                        </canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </form>
+</body>
+
+</html>
